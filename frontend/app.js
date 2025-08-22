@@ -11,36 +11,71 @@ let currentForm = null;
 
 /** Cargar todos los formularios */
 async function loadForms() {
-  const res = await fetch(API_URL);
-  const forms = await res.json();
-  formList.innerHTML = "";
-  forms.forEach(f => {
-    const li = document.createElement("li");
-    li.className = "list-group-item d-flex justify-content-between align-items-center";
-    li.innerHTML = `
-      <span><strong>${f.name}</strong> - ${f.description || ""}</span>
-      <button class="btn btn-sm btn-outline-primary">Seleccionar</button>
-    `;
-    li.querySelector("button").addEventListener("click", () => selectForm(f));
-    formList.appendChild(li);
-  });
+  try {
+    const res = await fetch(API_URL);
+    
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
+    }
+    
+    const forms = await res.json();
+    
+    // Verifica que forms sea un array
+    if (!Array.isArray(forms)) {
+      console.error("Expected array but got:", forms);
+      formList.innerHTML = "<li class='list-group-item text-danger'>Error: El servidor no devolvió datos válidos</li>";
+      return;
+    }
+    
+    formList.innerHTML = "";
+    
+    if (forms.length === 0) {
+      formList.innerHTML = "<li class='list-group-item'>No hay formularios creados</li>";
+      return;
+    }
+    
+    forms.forEach(f => {
+      const li = document.createElement("li");
+      li.className = "list-group-item d-flex justify-content-between align-items-center";
+      li.innerHTML = `
+        <span><strong>${f.name}</strong> - ${f.description || ""}</span>
+        <button class="btn btn-sm btn-outline-primary">Seleccionar</button>
+      `;
+      li.querySelector("button").addEventListener("click", () => selectForm(f));
+      formList.appendChild(li);
+    });
+  } catch (error) {
+    console.error("Error loading forms:", error);
+    formList.innerHTML = `<li class="list-group-item text-danger">Error al cargar formularios: ${error.message}</li>`;
+  }
 }
-
 /** Crear un nuevo formulario */
+/** Crear un nuevo formulario con manejo de errores */
 createForm.addEventListener("submit", async (e) => {
   e.preventDefault();
-  const name = document.getElementById("formName").value;
-  const description = document.getElementById("formDescription").value;
-  const schema = JSON.parse(document.getElementById("formSchema").value);
+  
+  try {
+    const name = document.getElementById("formName").value;
+    const description = document.getElementById("formDescription").value;
+    const schema = JSON.parse(document.getElementById("formSchema").value);
 
-  await fetch(API_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, description, schema })
-  });
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, description, schema })
+    });
 
-  createForm.reset();
-  loadForms();
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || `Error ${response.status}`);
+    }
+
+    createForm.reset();
+    loadForms();
+  } catch (error) {
+    console.error("Error creating form:", error);
+    alert(`Error al crear formulario: ${error.message}`);
+  }
 });
 
 /** Seleccionar un formulario y renderizarlo */
